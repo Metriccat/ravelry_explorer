@@ -1,0 +1,61 @@
+# analysis conclusion from Rav
+
+# general remarks
+limit approx for API GET request: 5000 items (on one page)
+
+# tag frequancies in projects 
+
+data: projects/search.json?page_size=5000&craft=knitting&sort=favorites"
+
+most faved projects have same-ish tags as the rest: favs pretty much follow general distribution
+most tags used only once
+most used tags: cardigan, baby, shawl, cables (followed by colorwork and lace)
+TODO: same with actual pattern category instead of tags (self-reporting), but needs crossing with patterns
+
+# stash 
+
+avoid "yarn" search: no info regarding popularity, less interesting appart from ratings maybe
+? sort by most favorites: first item has -1 fav count !
+"favorites" search order coresponds to yarn with most faves, not stash item ?
+
+col;or ditributions: changes non negligibly when sorting by #faves or best match
+entries with pics have a better chance of having more infos slike color
+=> use as filter at GET level to have more data (limit at 5000)
+
+################ general ideas:
+simple things: nbr of people, of projects in each yarn weight, total value of stashed yarns 
+(split by indie/not indie ? difficult to evaluate)
+most favorited yarn weight (sum favs for this weight)
+color as function of season: not interesting because there is winter green and spring green, and no split between the 2
+better: retrieve photos and do img analysis, but long and may not be ok in bulk due to copyright ? maybe ok with thumbs, enough for color
+most active knitters nbr projects, most notes ...
+world map with nbr projects/user average
+word cloud designers in projects containing tweed, lopi ...  designer linked to pattern => merge pattern search
+word cloud people fav swear word
+estimate total value of stash on ravelry
+pick high potential patterns (brooklyn tweed) and alltimestars
+and follow nbr of favorites over time
+yarn: color, wieght distribution in stashes
+which yarns have most faves: seems not informative many faves on non-yarn entries, search by reccently added ? prb seasons
+which yarns are all used up
+
+provide link to online r palette maker snippet if people want to experiment with color interpretation
+
+general complex questions with interesting answers:
+which projects have more favorites (reflects population tastes)
+ie: which type (clothing...), which color(s), which weight, baby/not baby, which yarns type
+how to get projects for a pattern (=sales!); correlates with nbr queued ? nbr projects faved ? nbr of faves ?
+which designers are most knitted; correlates with faved , queued ? (role of reputation)
+general simple questions: nbr projects, finished, avg stash size ...
+text mining on forum posts by group
+where the shops are (latitude, longitude)
+
+
+# API requests
+get number of matches for result in paginator attributes (query gives always 10000) ?
+
+people serach result not in api (fav curse word, colors and people's locations)
+
+search by color/weight in projects, but project data does not include color family 
+=> include it in project attributes ?
+prb: this comes from stash database ... same prb with pattern info (weight) searchable but not accessible in projects
