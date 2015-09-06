@@ -33,13 +33,6 @@ data <- subset(data, subset=(cat_freq[category] > 5))
 data$category <- factor(data$category)
 
 # text mining to find category
-test <- sample(dim(data)[1], 100)
-test_data <- data[test,]
-train_data <- data[-test,]
-
-corpus_train <- Corpus(VectorSource(train_data$description))
-names(corpus_train) <- train_data$category
-y_train <- train_data$category
 
 cleanCorpus = function(corpus){
   # lowercase
@@ -59,8 +52,6 @@ cleanCorpus = function(corpus){
   corpus <- tm_map(corpus, stemDocument, "english")
 }
 
-clean_train <- cleanCorpus(corpus_train)
-
 buildData = function(corpus, sparsity=0.999){
   dtm <- DocumentTermMatrix(corpus)
   # remove words that don't appear often enough for every category, else weird words and very large matrix
@@ -68,13 +59,45 @@ buildData = function(corpus, sparsity=0.999){
   dtm <- removeSparseTerms(dtm, sparsity)
 }
 
-dtm_train = buildData(clean_train,0.95)
-train_matrix <- as.matrix(dtm_train)
+test_ind <- sample(dim(data)[1], 200)
+test_data <- data[test_ind,]
+train_data <- data[-test_ind,]
 
-# naive bayes bad because categories dominated by Neck/Torso => predicts Neck/torso always
-model <- naiveBayes(train_matrix, y_train)
-pred <- predict(model, test_data$description)
+corpus_train <- Corpus(VectorSource(train_data$description))
+names(corpus_train) <- train_data$category
+y_train <- train_data$category
+
+corpus_test <- Corpus(VectorSource(test_data$description))
+names(corpus_test) <- test_data$category
+y_test <- test_data$category
+
+clean_train <- cleanCorpus(corpus_train)
+clean_test <- cleanCorpus(corpus_test)
+
+dtm_train = buildData(clean_train,0.8)
+train <- as.data.frame(as.matrix(dtm_train))
+names(train) <- dtm_train$dimnames$Terms
+  
+dtm_test = buildData(clean_test,0.8)
+test <- as.data.frame(as.matrix(dtm_test))
+names(test) <- dtm_test$dimnames$Terms
+
+# naive bayes 
+model <- naiveBayes(train, y_train)
+filter <- names(test) %in% names(train)
+test2 <- test[,filter]
+pred <- predict(model, test)
+(cbind(y_test,pred))
+# inspect model: probabilities of good predictors ("sweater", "warm") are high for the relevant categories
+# random is 1/16=6% success on y_test; most frequent value cte is 37% success with 100 in test set, 44% with 200
+#sparsity=0.95: 0% success, 0.8 19%, 0.7 23%, 0.6 37%, 0.5 35%,  0.4 34%, 0.2 37% 
+sum(pred==y_test)/length(y_test) 
 
 # multinomial logistic regression neural network: error msg
 train_tot <- cbind(as.data.frame(train_matrix),"category"=y_train)
 mylogit <- glm(category~., data=train_tot)
+
+# svm
+mysvm <- svm(dtm_train, y_train)
+dtm_test_filtered <- only terms appearing in test set
+pred <- predict(mysvm, dtm_test_filtered)

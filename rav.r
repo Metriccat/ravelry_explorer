@@ -10,8 +10,6 @@ library(reshape2)
 
 null2NA <- function(value) ifelse(is.null(value), NA, value)
 
-# todo: get raw html from pattern link and extract category from these (is public, use html tags)
-
 ########### patterns
 
 # patterns using thick yarns (not necessarily all linked to thick yarn projects)
