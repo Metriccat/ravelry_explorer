@@ -3,6 +3,7 @@
 library(httr)
 library(XML)
 library(reshape2)
+library(quantmod)
 
 categories = c("hat","sweater","neck-torso","feet-legs","hands","home","toysandhobbies","pattern-component","pet")
 
@@ -31,5 +32,21 @@ pattern_prices <- lapply(pattern_info, function(html) getNodeSet(html,
                                                                  path="//strong[@class='price']/a/text()", 
                                                                  fun=xmlValue)[[1]] )
 
+num_prices <- lapply(pattern_prices, function(str) c("price"=regmatches(str,
+                                                                regexpr("[[:digit:]]+\\.*[[:digit:]]*",str)),
+                                                     "currency"=substr(str,nchar(str)-2,nchar(str)) 
+                                                     )
+                     )
+
+price_data  <- data.frame(matrix(unlist(num_prices), nrow=length(num_prices), byrow=T), stringsAsFactors=F)
+price_data <- cbind(permalinks[1:45,], price_data )
+names(price_data) <- c("link", "category", "price", "currency")
+price_data$price <- as.numeric(price_data$price)
+
+currencies_codes = sapply(price_data$currency, paste,"EUR",sep="")
+# puts exchange rate in the environment, sapply does not change env variables
+for (curr in unique(price_data$currency)) getFX(paste(curr,"/EUR",sep=""),from = Sys.Date())
+exchange_rates = sapply(currencies_codes, get)
+price_data$price_eur = price_data$price * exchange_rates
 
 
