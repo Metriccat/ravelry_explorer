@@ -6,9 +6,10 @@ library(reshape2)
 library(quantmod)
 library(ggplot2)
 
-categories = c("hat","sweater","neck-torso","feet-legs","hands","home","toysandhobbies","pattern-component","pet")
+categories <- c("hat","sweater","neck-torso","feet-legs","hands","home","toysandhobbies","pattern-component","pet")
 
-search_url = "https://api.ravelry.com/patterns/search.json?page_size=2000&sort=projects&craft=knitting&availability=ravelry%2B-free&pc="
+# full treatment 1h30 for 500/category
+search_url <- "https://api.ravelry.com/patterns/search.json?page_size=500&sort=projects&craft=knitting&availability=ravelry%2B-free&pc="
 
 cat_search <- sapply(categories, function(name) paste(search_url,name,sep="",collapse=""))
 
@@ -26,11 +27,11 @@ permalinks_full <- sapply(permalinks$link, function(name) paste("http://www.rave
 
 samp = sample(1:length(permalinks$link),length(permalinks$link))
 permalinks_full <- permalinks_full[samp]    #random sampling    
-permalinks <- permalinks[samp,]    #random sampling    
+permalinks <- permalinks[samp,]       
 
 # web scraping to get the price from the pattern page
 # about 1 min for 50 links
-n=10000 # 1000 ok
+n=dim(permalinks)[1] # 1000 ok
 pattern_info <- lapply(permalinks_full[1:n], htmlTreeParse, useInternalNodes = TRUE)
 names(pattern_info) <- permalinks$link[1:n]
 # euros conversion only for logged users; price available only for rav downloads
@@ -43,22 +44,46 @@ num_prices <- lapply(pattern_prices, function(str) c("price"=regmatches(str,
                                                      "currency"=substr(str,nchar(str)-2,nchar(str)) 
                                                      )
                      )
-length(pattern_info)
+
+
+pattern_nbr_projects <- melt(sapply(pattern_info, nbr_projects))
+
 price_data  <- data.frame(matrix(unlist(num_prices), nrow=length(num_prices), byrow=T), stringsAsFactors=F)
-price_data <- cbind(permalinks[1:n,], price_data )
-names(price_data) <- c("link", "category", "price", "currency")
+price_data <- cbind(pattern_nbr_projects, permalinks[1:n,], price_data)
+names(price_data) <- c("nbr_projects", "link","category", "price", "currency")
 price_data$price <- as.numeric(price_data$price)
 
-currencies_codes = sapply(price_data$currency, paste,"EUR",sep="")
+currencies_codes = sapply(price_data$currency, paste,"USD",sep="")
 # puts exchange rate in the environment, sapply does not change env variables
-for (curr in unique(price_data$currency)) getFX(paste(curr,"/EUR",sep=""),from = Sys.Date())
+for (curr in unique(price_data$currency)) getFX(paste(curr,"/USD",sep=""),from = Sys.Date())
 exchange_rates = sapply(currencies_codes, get)
-price_data$price_eur = price_data$price * exchange_rates
+price_data$price_usd = price_data$price * exchange_rates
 
-dat <- data.frame(xx = c(runif(100,20,50),runif(100,40,80),runif(100,0,30)),yy = rep(letters[1:3],each = 100))
-categories = c("hat","sweater","neck-torso","feet-legs","hands","home","toysandhobbies","pattern-component","pet")
+ggplot(price_data,aes(x = category, y=price_usd,fill=category)) + 
+  geom_boxplot(alpha=0.5) +
+  xlab("Category") +
+  ylab("Price in USD") +
+  ggtitle("Pattern prices distributions in each category")
 
-ggplot(price_data,aes(x=price_eur)) + 
-  geom_histogram(data=subset(price_data, category == categories[1]),fill = "red", alpha = 0.2) +
-  geom_histogram(data=subset(price_data, category == categories[2]),fill = "blue", alpha = 0.2) 
-  
+
+ggplot(price_data,aes(x = category, y=price_usd,fill=category)) + 
+  geom_violin(alpha=0.5) +
+  xlab("Category") +
+  ylab("Price in USD") +
+  ggtitle("Pattern prices distributions in each category")
+
+# histogram, outliers cut away
+ggplot(price_data) + 
+  geom_histogram(aes(x = price_usd), fill='Blue', alpha=0.5, binwidth=0.5) +
+  scale_x_continuous(limits = c(0, 20), breaks = round(seq(0, 20, by = 1),1)) +
+  xlab("Pattern price in USD") +
+  ylab("Number of patterns") +
+  ggtitle("Distribution of knitting patterns prices")
+
+
+plot(sort(price_data$nbr_projects))
+
+# not sure looking at correlation between price and nbr projects is useful
+# nbr projects should only weakly depend on price point, many outliers will skew distribution
+# => exclude outliers ? 
+# or make other post with decreasing nbr of projects plot to check what the median nbr of projects is
