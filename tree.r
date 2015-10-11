@@ -1,12 +1,14 @@
-# make pattern category tree
+# Plot Ravelry knitting patterns category 
+# as a tree (nested rectangles)
 
 library(treemap)
 library(reshape2)
 
+# Nested list representing the knitting pattern breakdown by category
+# Coresponds to by craft=knitting and has-photo=True: 360856 hits in August 2015
+# Data entered by hand from Ravelry public information
 
-# pattern breakdown by category; knitting+has photo: 360856 hits
-
-pattern_nbr_tree <- list("Clothing"=list("Coat/Jacket"=10707,
+patternCatTree <- list("Clothing"=list("Coat/Jacket"=10707,
                                          "Dress"=5232,
                                          "Intimate Apparel"=list("Bra"=35,
                                                                  "Pasties"=10,
@@ -58,13 +60,17 @@ pattern_nbr_tree <- list("Clothing"=list("Coat/Jacket"=10707,
                          "All Pet"=1551,
                          "All Components"=7073)
 
-pattern_nbr_tree <- melt(pattern_nbr_tree)
-# one more tree level with accesories ! maybe more
-names(pattern_nbr_tree) <- c("patterns_count","cat3","cat2","cat1")
+# Make a data frame from the nested list
+patternCatTree <- melt(patternCatTree)
+# Warning: tree depth will increase for more complete breakdown, may be more than 3 levels
+names(patternCatTree) <- c("patterns_count", "cat3", "cat2", "cat1")
 
-custom_palette = c("#FAF0E6","#7FFFD4","#008080","#FF6347","#FA8072","#B0C4DE")
-treemap(pattern_nbr_tree,index=c("cat1","cat2","cat3"),vSize="patterns_count",
+# R default tree colors are ugly 
+customPalette = c("#FAF0E6", "#7FFFD4", "#008080", "#FF6347", "#FA8072", "#B0C4DE")
+# Plot tree as nested rectangles
+treemap(patternCatTree, index=c("cat1", "cat2", "cat3"), vSize="patterns_count",
         title="Number of knitting patterns per category",
-        palette=custom_palette,border.col="White",border.lwds=c(6,3,0.5),
-        bg.labels=0,fontsize.labels=c(16,16,11),
+        palette=customPalette, border.col="White", border.lwds=c(6,3,0.5),
+        bg.labels=0, fontsize.labels=c(16,16,11),
         align.labels=list(c("left", "top"), c("center", "center"), c("center", "center")))
+

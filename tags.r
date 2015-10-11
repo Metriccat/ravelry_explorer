@@ -1,16 +1,24 @@
+# Explore tags on Ravelry knitting projects
+
 library(tm)
 library(wordcloud)
 library(dplyr)
 library(ggplot2)
 
-#### tag mining on projects
-
-get_tags <- function(projects, fav_threshold){
-  # make corpus from project tags, use only projects where nbr of favorites >= fav_threshold
-  # if fav_threshold is a vector, each document in corpus coresponds nbr of favorites >= threshold
+GetTags <- function(projects, fav_threshold){
+  # Args: list of project objects returned by Ravelry API
+  #       threshold for the number of favorites (numeric or vector)
+  # Returns document corpus
+  # if threshold is numeric, 1 document in corpus with all tags in project list having
+  # nbr of favorites >= fav_threshold
+  # if threshold is a vector, each document in corpus coresponds to tags in projects having
+  # nbr of favorites >= threshold
+  
   tags <- 1:length(fav_threshold)
-  for (i in seq_along(fav_threshold)){
-    tags_threshold <- lapply(projects, function(x) ifelse(x$favorites_count>=fav_threshold[i],x$tag_names,""))
+  for (i in seq_along(fav_threshold)) {
+    tags_threshold <- lapply(projects, function(x) ifelse(x$favorites_count >= fav_threshold[i],
+                                                          x$tag_names,
+                                                          ""))
     tags[i] <- paste(unlist(tags_threshold), collapse=" ")
   }
   corpus_tags <- Corpus(VectorSource(tags))
@@ -22,8 +30,9 @@ get_tags <- function(projects, fav_threshold){
   return(corpus_tags)
 }
 
-tags_frequencies <- function(corpus_tags){
-  # return tags and their frequencies in each document of corpus
+TagsFrequencies <- function(corpus_tags) {
+  # Arg: document corpus built using the get_tags function
+  # Returns data frame with tags and their frequencies in each document of corpus
   tdm = TermDocumentMatrix(corpus_tags) 
   tdmframe = as.data.frame(as.matrix(tdm) )
   names(tdmframe) = names(corpus_tags)
@@ -31,39 +40,45 @@ tags_frequencies <- function(corpus_tags){
   return(tdmframe)
 }
 
-plot_tag_freq <- function(all_freq){
-  # plot tags frequency with labels
-  ggplot()+
-    geom_bar(aes(x=seq_along(all_freq$tags), y = all_freq$fav0), stat="identity", fill='Gold')+
-    #geom_bar(aes(x=seq_along(all_freq$tags), y = all_freq$fav500), stat="identity", fill='#11AAAA')+
-    geom_text(aes(x=seq_along(all_freq$tags), 
-                  y=all_freq$fav0, 
-                  label=all_freq$tags),
+PlotTagFreq <- function(allFreq){
+  # Plot tags frequency with labels
+  ggplot() +
+    geom_bar(aes(x=seq_along(allFreq$tags), y = allFreq$fav0), stat="identity", fill='Gold') +
+    #geom_bar(aes(x=seq_along(allFreq$tags), y = allFreq$fav500), stat="identity", fill='#11AAAA') +
+    geom_text(aes(x=seq_along(allFreq$tags), 
+                  y=allFreq$fav0, 
+                  label=allFreq$tags),
               hjust=1.01, 
               position=position_dodge(width=0.9) ) +
-    scale_x_reverse()+
-    ylab("tag frequency")+
-    xlab("tag")+
-    ggtitle("Frequency of most used tags on popular projects.")+
-    theme(axis.text.y=element_blank())+
-    theme(axis.ticks.y=element_blank())+
+    scale_x_reverse() +
+    ylab("tag frequency") +
+    xlab("tag") +
+    ggtitle("Frequency of most used tags on popular projects.") +
+    theme(axis.text.y=element_blank()) +
+    theme(axis.ticks.y=element_blank()) +
     coord_flip()
 }
 
 
-# all knitting projects sorted by most favorites
-knit_all <- GET("https://api.ravelry.com/projects/search.json?page_size=5000&craft=knitting&sort=favorites", config=config("token"=ravelry.token))
-knit <- content(knit_all)
+# Get from API a list of knitting projects sorted by most favorites
+knitAll <- GET("https://api.ravelry.com/projects/search.json?page_size=5000&craft=knitting&sort=favorites", config=config("token"=ravelry.token))
+knit <- content(knitAll)
 
-alltags = get_tags(knit$projects, 0)
+# use the above functions to explore the tags
+alltags = GetTags(knit$projects, 0)
 #wordcloud(alltags, max.words=100,colors=brewer.pal(8, "Dark2"),rot.per=0)
-all_freq = tags_frequencies(alltags)
-all_freq = arrange(all_freq, desc(fav0)) # sort by most frequent tags on all dataset
-all_freq=all_freq[1:30,]
-correction <- c(babi="baby", cabl="cable",pullov="pullover",bulki="bulky",contigu="contiguous",finger="fingering")
-realword <- function(x) ifelse(x %in% names(correction), correction[x],x)
-all_freq$tags <- sapply(all_freq$tags, realword)
-wordcloud(words=all_freq$tags, freq=all_freq$fav0,colors=brewer.pal(8, "Dark2"),rot.per=0)
+allFreq = TagsFrequencies(alltags)
+# sort by most frequent tags on all dataset
+allFreq = arrange(allFreq, desc(fav0)) 
+# keep only the most frequent
+allFreq=allFreq[1:30,]
+# corpus stems words to calculate frequencies;
+# get full word for more attractive labelling
+correction <- c(babi="baby", cabl="cable",pullov="pullover",
+                bulki="bulky", contigu="contiguous", finger="fingering")
+RealWord <- function(x) ifelse(x %in% names(correction), correction[x], x)
+allFreq$tags <- sapply(allFreq$tags, RealWord)
+wordcloud(words=allFreq$tags, freq=allFreq$fav0, colors=brewer.pal(8, "Dark2"), rot.per=0)
 
 # get real tag names
 #library(wordnet)
@@ -71,5 +86,6 @@ wordcloud(words=all_freq$tags, freq=all_freq$fav0,colors=brewer.pal(8, "Dark2"),
 #filter <- sapply(ta, function(x) getTermFilter("StartsWithFilter", x, TRUE))
 #terms <- lapply(filter, function(x) getIndexTerms("NOUN", 1, x))
 #realtags <- sapply(terms, function(x) sapply(x, getLemma))
-# TODO quite complex, fast hack in the meantime
-plot_tag_freq(all_freq)
+# TODO quite complex, use fast hack above in the meantime
+
+PlotTagFreq(allFreq)

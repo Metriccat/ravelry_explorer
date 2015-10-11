@@ -1,15 +1,16 @@
-# follow number of favorites/projects as a function of time for patterns in list
-# scheduled with cron job to get data every day at 9h, Paris time (workday ended in all the USA: 0h in LA, 3h NY)
+# Follow the number of favorites/projects/... as a function of time for patterns in input list
+# Scheduled with cron job to get data every day 
 
 library(httr)
 
-#get token from saved environement
-load("/home/saskia/R/ravelry_explorer/token_ID_to_follow.RData")
+# Get token from saved environement
+load("/Users/saskia/R/ravelry_explorer/ID_3popular.RData")
 
-# launch then put in a R environment: gets pattern IDs from names
-# get IDs from permalinks; one search result per permalink search (unique identification)
-# permalinks_to_follow <- c("barley-2","hitofude-cardigan","honey-cowl")
-# queries <- lapply(permalinks_to_follow, 
+# To get the patterns IDs into a saved environement (comment after saving the environement):
+# Get IDs from permalinks; one search result per permalink search (unique identification)
+# It is actually possible to get the patterns directly from permalinks without going through IDs
+#permalinks_to_follow <- c("barley-2","hitofude-cardigan","honey-cowl")
+#queries <- lapply(permalinks_to_follow, 
 #                   function(x) GET(paste("https://api.ravelry.com/patterns/search.json?page_size=10&query=",x,sep=""),
 #                                   config=config("token"=ravelry.token)))
 # content_to_follow <- lapply(queries, content)
@@ -26,8 +27,11 @@ pattern_data <- sapply(pats, function(x) x$pattern[c("permalink",
                                                      "favorites_count",
                                                      "comments_count")])
 
+# Reshape to data frame and add date/time
 pattern_df <- data.frame(matrix(unlist(pattern_data), nrow=length(ID_to_follow), byrow=T))
 pattern_df$time <- Sys.Date()
+# FYI because names won't be in saved text file to avoid repeated header
 #names(pattern_df) <- c("permalink","queued_projects_count","projects_count","favorites_count","comments_count","time")
 
-write.table(pattern_df, file = "/home/saskia/R/ravelry_explorer/pattern_follow.txt",append=T,row.names=F,col.names=F,quote=F)
+write.table(pattern_df, file = "/Users/saskia/R/ravelry_explorer/pattern_follow2.txt", 
+            append=T, row.names=F, col.names=F, quote=F)

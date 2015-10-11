@@ -1,14 +1,15 @@
+# Functions to get Ravelry API token and test connection.
 
 library(httr)
 
-
-########## open API connection
-
+# user_rav.txt contains API username and password 
 credentials <- readLines("user_rav.txt")
 names(credentials) <- c("user","access_key","secret_key")
 
-open_connection <- function(credentials){
-  # open connection to Ravelry API and return token
+OpenConnection <- function(credentials){
+  # Args: login info for the Ravelry API
+  # Returns oauth token
+  # Open connection to Ravelry API and return token
   reqURL <- "https://www.ravelry.com/oauth/request_token"
   accessURL <- "https://www.ravelry.com/oauth/access_token"
   authURL <- "https://www.ravelry.com/oauth/authorize"
@@ -20,12 +21,15 @@ open_connection <- function(credentials){
   return(oauth1.0_token(ravelry.urls, ravelry.app))
 }
 
-test_connection <- function(ravelry.token){
-  #quick test of API connection by getting connected user info
+# Quick test of API connection by getting connected user info
+TestConnection <- function(ravelry.token) {
+  # Arg: API token
+  # Returns name of the user connected with this token
   test <- GET("https://api.ravelry.com/current_user.json", 
               config=config("token"=ravelry.token)) 
   print(content(test)$user$username)
 }
 
-ravelry.token <- open_connection(credentials)
-test_connection(ravelry.token)
+ravelry.token <- OpenConnection(credentials)
+TestConnection(ravelry.token)
+

@@ -1,11 +1,16 @@
-# pattern category from rav page (not API)
+# Build a dataset of pattern categories and text description from Ravelry pages
+# Try some classification algorithms on it
 
 library(XML)
 library(RCurl)
 library(tm)
 library(e1071)
 library(nnet)
+library(glmnet)
+library(plyr)
 
+## Build dataset from Ravelry API: pattern permalink, pattern category, pattern text description
+# Get url to patterns of interest from API search
 pat0 <- GET("https://api.ravelry.com/patterns/search.json?page_size=2000&craft=knitting", config=config("token"=ravelry.token))
 pat <- content(pat0)
 
@@ -13,7 +18,7 @@ permalinks <- sapply(pat$patterns, function(x) x$permalink)
 permalinks_full <- sapply(permalinks, function(name) paste("http://www.ravelry.com/patterns/library/",name,sep="",collapse=""))
 names(permalinks_full) <- permalinks
 
-# get toplevel category and description text from web (not API)
+# Get top level pattern category and description text using web scraping 
 pattern_info <- lapply(permalinks_full, htmlTreeParse, useInternalNodes = TRUE)
 
 pattern_description_par <- lapply(pattern_info, getNodeSet, path="//p", fun=xmlValue)
@@ -22,50 +27,66 @@ pattern_description <- sapply(pattern_description_par, paste, collapse=" ")
 pattern_cat <- lapply(pattern_info, getNodeSet, path="//div[@class='category']/a/span/text()", fun=xmlValue)
 pattern_topcat <- simplify2array(sapply(pattern_cat, head, 1))
 
+## Data: 3 columns with pattern permalink, text description, and toplevel category
 data <- as.data.frame(cbind(permalinks, pattern_topcat, pattern_description),stringsAsFactors=F,row.names=F)
 names(data) <- c("permalink", "category", "description")
 data$category <- as.factor(data$category)
 
 cat_freq <- table(data$category)
+nbr_examples <- dim(data)[1]
 
-# remove from data the categories with too few examples
-data <- subset(data, subset=(cat_freq[category] > 5))
+# Remove from data the categories with too few examples
+data <- subset(data, subset=(cat_freq[category] > nbr_examples/5))
 data$category <- factor(data$category)
+str(data)
 
-# text mining to find category
+# Keep only some categories (manually)
+#data <- subset(data, subset = data$category %in% c("Sweater","Neck / Torso","Feet / Legs","Hat","Hands"))
+#data$category <- factor(data$category)
+
+## Text mining to predict category
 
 cleanCorpus = function(corpus){
-  # lowercase
-  corpus <- tm_map(corpus, tolower)
+  # To lowercase
+  corpus <- tm_map(corpus, content_transformer(tolower))
   # Remove stopwords first, else for ex. l'or becomes lor and l' is not removed
   corpus <- tm_map(corpus, removeWords, stopwords("english"))
-  # remove punctuation
+  # Remove punctuation
   corpus <- tm_map(corpus, removePunctuation)
-  corpus <- tm_map(corpus, function(str) gsub("[^[:alnum:] ]", " ",str))
-  # remove  html tags with regexp
-  corpus <- tm_map(corpus, function(x) gsub("<[a-z]*>", " ", x))
-  # remove numbers - but they may be useful as dimensions or phone hours ...
+  corpus <- tm_map(corpus, content_transformer(function(str) gsub("[^[:alnum:] ]", " ",str)))
+  # Remove  html tags with regexp
+  corpus <- tm_map(corpus, content_transformer(function(x) gsub("<[a-z]*>", " ", x)))
+  # Remove numbers - but they may be useful ... TODO ?
   corpus <- tm_map(corpus, removeNumbers)
-  # simplify whitespace
+  # Simplify whitespace
   corpus <- tm_map(corpus, stripWhitespace)
-  # stem words (tm_map stem has type error)
-  corpus <- tm_map(corpus, stemDocument, "english")
+  # Stem words (tm_map stem has type error), use option lazy=T on mac os
+  corpus <- tm_map(corpus, stemDocument, "english", lazy=T)
 }
 
 buildData = function(corpus, sparsity=0.999){
+  # Arg: corpus where one document is one pattern description
+  #      optionnal float word sparsity threshold 
+  #      default: remove (almost) nothing
+  # Returns Document Term Matrix
   dtm <- DocumentTermMatrix(corpus)
   # remove words that don't appear often enough for every category, else weird words and very large matrix
-  # default: remove (almost) nothing
   dtm <- removeSparseTerms(dtm, sparsity)
 }
 
-test_ind <- sample(dim(data)[1], 200)
+## Build train and test corpus and associated dtm 
+test_ind <- sample(dim(data)[1], dim(data)[1]/3)
 test_data <- data[test_ind,]
 train_data <- data[-test_ind,]
 
 corpus_train <- Corpus(VectorSource(train_data$description))
 names(corpus_train) <- train_data$category
 y_train <- train_data$category
+
+# Check the category frequencies
+sort(table(data$category))
+# Check text example
+corpus_train[[1]]$content
 
 corpus_test <- Corpus(VectorSource(test_data$description))
 names(corpus_test) <- test_data$category
@@ -74,30 +95,64 @@ y_test <- test_data$category
 clean_train <- cleanCorpus(corpus_train)
 clean_test <- cleanCorpus(corpus_test)
 
-dtm_train = buildData(clean_train,0.8)
+clean_train[[1]]
+
+dtm_train = buildData(clean_train,0.9)
 train <- as.data.frame(as.matrix(dtm_train))
 names(train) <- dtm_train$dimnames$Terms
-  
-dtm_test = buildData(clean_test,0.8)
+train[1:3,1:3]
+
+dtm_test = buildData(clean_test,0.9)
 test <- as.data.frame(as.matrix(dtm_test))
 names(test) <- dtm_test$dimnames$Terms
 
-# naive bayes 
+## Naive bayes 
+# Tests with various categories show that perf goes down when adding
+# categories with not a lot of cases, perf good with 2 top frequent factors
 model <- naiveBayes(train, y_train)
-filter <- names(test) %in% names(train)
+# Can't predict categories never seen in train set => remove them
+filter <- names(test) %in% names(train) 
 test2 <- test[,filter]
 pred <- predict(model, test)
 (cbind(y_test,pred))
-# inspect model: probabilities of good predictors ("sweater", "warm") are high for the relevant categories
-# random is 1/16=6% success on y_test; most frequent value cte is 37% success with 100 in test set, 44% with 200
-#sparsity=0.95: 0% success, 0.8 19%, 0.7 23%, 0.6 37%, 0.5 35%,  0.4 34%, 0.2 37% 
-sum(pred==y_test)/length(y_test) 
+# Inspect model: probabilities of good predictors ("sweater", "warm") are high for the relevant categories
+mean(pred==y_test)
+table(pred, y_test)
+# Interpretation: mean number of word occurences in each target class
+count <- model$tables
+count2 <- as.data.frame(do.call(rbind,count), row.names=seq_along(count))
+names(count2) <- c("meanOcc","stdOcc")
+count2$word = rep(names(count), each=2)
+count2$word = rep(names(count), each=2)
+count2$categ = rep(c("Neck / Torso","Sweater"), length(count2)/2)
+head(arrange(count2,desc(meanOcc)))
 
-# multinomial logistic regression neural network: error msg
-train_tot <- cbind(as.data.frame(train_matrix),"category"=y_train)
-mylogit <- glm(category~., data=train_tot)
+## Regularized logistic regression 
+regLinCV <- cv.glmnet(as.matrix(train), y_train, family="binomial", alpha=1)
+plot(regLinCV)
+# Get consistent set of words between test and train
+# Keep from test only the words that also are in train data
+test2 <- test[,intersect(colnames(train),colnames(test))]
+# Add to test the words that were in train data but not test data, marks as 0 occurences
+# TODO: clean this ...
+trainWordsNotInTest <- setdiff(names(train), names(test2))
+yy <- data.frame(matrix(0, ncol = length(trainWordsNotInTest),
+                        nrow = dim(test2)[1]))
+names(yy) <- trainWordsNotInTest
+names(yy) <- names(train)
+# Final processed test set
+test3 <- cbind(test2, yy)
+# Prediction: NB returns probabilities for each category, take max as prediction
+newCV <- predict(regLinCV, as.matrix(test3), s="lambda.min")
+# For multinomial (> 2 categories)
+newCVmax = apply(newCV[,,1], MARGIN=1, FUN=function(row) names(row)[which.is.max(row)])
+# For binomial (use only 2 categories)
+newCVmax = as.factor(ifelse(newCV < 0.5,"Sweater","Neck / Torso"))
+# Percentage of correct answers on our test set
+mean(newCVmax == as.character(y_test))
+table(newCVmax, as.character(y_test))
 
-# svm
+# svm notes - TODO
 mysvm <- svm(dtm_train, y_train)
 dtm_test_filtered <- only terms appearing in test set
 pred <- predict(mysvm, dtm_test_filtered)
