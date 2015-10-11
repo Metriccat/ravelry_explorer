@@ -1,5 +1,5 @@
 R code for data exploration of www.ravelry.com, a social network around knitting. For more details, check out my blog: datasock.wordpress.com.
 
-In order to use the code, you will most of the time need to register on ravelry.com to get API access.
+In order to use the code, you will most of the time need API access; you can register in the Ravelry API group at http://www.ravelry.com/groups/ravelry-api
 
 warning: rav.r is just a bunch of notes in code form ...

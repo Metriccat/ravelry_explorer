@@ -1,14 +1,13 @@
-# time series of pattern fvaes, comments etc as function of time
+# Plot time series of pattern popularity (number of favorites)
+# in the Brooklyn Tweed Fall 2015 collection
 
 library(ggplot2)
 library(scales)
 library(plyr)
 library(TTR)
 
-#pattern_time <- read.csv("pattern_follow.txt",header=F,sep=" ")
+# Get data from text file saved by the Cron-scheduled R script
 BT_time <- read.csv("BT_follow.txt",header=F,sep=" ")
-#pattern_names <- c("barley-2","hitofude-cardigan","honey-cowl")
-#names(pattern_time) <- c("permalink","queued_projects_count","projects_count","favorites_count","comments_count","date")
 names(BT_time) <- c("pattern","queued_projects_count","projects_count","favorites_count","comments_count","day","time")
 names_BT <- c("ashland-2","bannock","birch-bay-2","cascades","deschutes-2","copse-2",
              "fletching-3","lander","lolo","mcloughlin","nehalem-2","riverbend-2",
@@ -16,6 +15,7 @@ names_BT <- c("ashland-2","bannock","birch-bay-2","cascades","deschutes-2","cops
 names_full <- c("Ashland","Bannock","Birch Bay","Cascades","Deschutes","Copse",
                 "Fletching","Lander","Lolo","McLoughlin","Nehalem","Riverbend",
                 "Sauvie","Trailhead","Willamette")
+# Custom colors from Medialab
 BT_colors <- c("#C4BA93",
                "#BD57C9",
                "#D2493C",
@@ -34,9 +34,9 @@ BT_colors <- c("#C4BA93",
 names(names_full) <- names_BT
 BT_time <- subset(BT_time,subset=(pattern %in% names_BT))
 BT_time$pattern <- droplevels(BT_time$pattern)
-# use pattern name instead of permalink
+# Use pattern name as ID instead of permalink
 BT_time$pattern <- revalue(BT_time$pattern, names_full)                                                
-# egt full date from day and hour/min, in BT local time (PDT)
+# Get full date from day and hour/min, in BT local time (PDT)
 BT_time$date <- as.POSIXct(paste(BT_time$day, BT_time$time))
 attributes(BT_time$date)$tzone <- "America/Los_Angeles" 
   
@@ -46,7 +46,7 @@ attributes(BT_time$date)$tzone <- "America/Los_Angeles"
 #                                      "time"=pattern_time$time, stringsAsFactors=F), stringsAsFactors=F)
 
 
-# corelation between queuing and favoriting
+# Corelation between queuing and favoriting
 ddply(BT_time, 
       .(pattern), 
       function(data) data.frame(correl = cor(data$favorites_count,
@@ -55,6 +55,7 @@ ddply(BT_time,
 n=dim(BT_time)[1]
 lastdate = BT_time$date[n]
 
+# Plot favorites for each pattern as time series
 ggplot(BT_time) + 
   geom_line(aes(x=date, y=favorites_count, color=pattern, group=pattern)) +
   geom_text(data=BT_time[BT_time$date ==lastdate,], 
@@ -70,7 +71,7 @@ ggplot(BT_time) +
   ggtitle("Evolution of number of favorites on BT Fall 2015 patterns")
 
 
-# nbr of favorites per unit time
+# Number of favorites per unit time (favoriting rate)
 dfav_dt <- function(data){
   n <- dim(data)[1] # nbr lines
   favdiff <- c(0, diff(data$favorites_count)) # length n
@@ -85,6 +86,7 @@ dfav_dt <- function(data){
 m <- 3000
 rates <- ddply(BT_time[1:m,],.(pattern), dfav_dt)
 
+# Normalize data to better compare time series shapes
 norm_col <- function(data){
   maxd <- max(data$deriv, na.rm=T)
   return(cbind(data,norm_deriv=data$deriv/maxd))
