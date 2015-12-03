@@ -8,6 +8,8 @@ library(TTR)
 
 # Get data from text file saved by the Cron-scheduled R script
 BT_time <- read.csv("BT_follow.txt",header=F,sep=" ")
+BT_time2 <- read.csv("BT_follow2.txt",header=F,sep=" ")
+BT_time <- rbind(BT_time, BT_time2)
 names(BT_time) <- c("pattern","queued_projects_count","projects_count","favorites_count","comments_count","day","time")
 names_BT <- c("ashland-2","bannock","birch-bay-2","cascades","deschutes-2","copse-2",
              "fletching-3","lander","lolo","mcloughlin","nehalem-2","riverbend-2",

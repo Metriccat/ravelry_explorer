@@ -9,8 +9,8 @@ load("/Users/saskia/R/ravelry_explorer/ID_3popular.RData")
 # To get the patterns IDs into a saved environement (comment after saving the environement):
 # Get IDs from permalinks; one search result per permalink search (unique identification)
 # It is actually possible to get the patterns directly from permalinks without going through IDs
-#permalinks_to_follow <- c("barley-2","hitofude-cardigan","honey-cowl")
-#queries <- lapply(permalinks_to_follow, 
+# permalinks_to_follow <- c("barley-2","hitofude-cardigan","honey-cowl","aranami-shawl")
+# queries <- lapply(permalinks_to_follow, 
 #                   function(x) GET(paste("https://api.ravelry.com/patterns/search.json?page_size=10&query=",x,sep=""),
 #                                   config=config("token"=ravelry.token)))
 # content_to_follow <- lapply(queries, content)
